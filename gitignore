@@ -1,0 +1,11 @@
+# !! IMPORTANT: config.js contains your bot token — never commit it !!
+config.js
+.env
+
+# Node
+node_modules/
+package-lock.json
+
+# OS
+.DS_Store
+Thumbs.db

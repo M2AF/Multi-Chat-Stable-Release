@@ -1,0 +1,12 @@
+{
+  "name": "multichat",
+  "version": "1.0.0",
+  "description": "Multi-platform stream chat overlay — Twitch, YouTube, Kick, Abstract, Discord",
+  "main": "discord-bridge.js",
+  "scripts": {
+    "start": "node discord-bridge.js"
+  },
+  "dependencies": {
+    "ws": "^8.17.0"
+  }
+}
