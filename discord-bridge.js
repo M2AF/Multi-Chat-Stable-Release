@@ -1,5 +1,5 @@
 /**
- * discord-bridge.js — CriptoEjesus MultiChat
+ * discord-bridge.js — MultiChat
  *
  * Requirements: node >= 16, npm install ws
  * Run: node discord-bridge.js

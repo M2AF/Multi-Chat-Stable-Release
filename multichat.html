@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CriptoEjesus — MultiChat</title>
+<title>MultiChat</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
 
@@ -552,7 +552,15 @@
 
 </div>
 
-<script src="config.js"></script>
+<script>
+(function() {
+  if (window.__electronBridge) {
+    const cfg = window.__electronBridge.loadConfig();
+    if (cfg) window.CONFIG = cfg;
+  }
+})();
+</script>
+<script src="config.js" onerror="console.warn('config.js not found — using defaults')"></script>
 <script>
 /* ── State Management ── */
 let filter = 'all';
@@ -886,7 +894,8 @@ function connectAbstract() {
   ws.onclose = () => setTimeout(connectAbstract, 5000);
 }
 
-connectAbstract();
+// Only connect to Abstract if a URL is configured
+if (ABS_WS_URL) connectAbstract();
 
 /* ── Discord Bridge WebSocket ── */
 function connectDiscord() {
@@ -911,8 +920,17 @@ function connectDiscord() {
 connectDiscord();
 
 function toggleUI() {
-  document.getElementById('app').classList.toggle('ui-hidden');
+  const app = document.getElementById('app');
+  app.classList.toggle('ui-hidden');
+  saveSettings({ uiHidden: app.classList.contains('ui-hidden') });
 }
+
+// Restore UI hidden state on load
+(function() {
+  if (loadSettings().uiHidden) {
+    document.getElementById('app').classList.add('ui-hidden');
+  }
+})();
 
 // ── Load branding & links from CONFIG ────────────────────────────────────────
 (function() {
