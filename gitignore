@@ -1,11 +1,15 @@
-# !! IMPORTANT: config.js contains your bot token — never commit it !!
+# !! SECRET — never commit these !!
 config.js
 .env
 
-# Node
+# Node dependencies — reinstalled with npm install
 node_modules/
 package-lock.json
 
-# OS
+# Electron build output — distribute separately, not via GitHub
+dist/
+
+# OS junk
 .DS_Store
 Thumbs.db
+*.log
