@@ -12,6 +12,14 @@ npm install
 npm start
 ```
 
+The setup wizard will appear on first run. After completing it, relaunch
+with `npm start` again to see the chat window.
+
+To force the setup wizard again, delete:
+```
+%APPDATA%\MultiChat\multichat-config.json
+```
+
 ## Build the .exe installer
 
 ```bash
@@ -33,32 +41,28 @@ Create an `assets/` folder and add:
 - `assets/icon.ico` — Windows icon (256x256 recommended)
 - `assets/icon.png` — Used for the system tray (32x32 or 64x64)
 
-If no icon is provided the app will still build and run, just without a custom icon.
+Free converter: https://convertio.co/png-ico/
+
+If no icon files are found the app will build and run without a custom icon.
 
 ---
 
 ## How it works
 
-When you launch MultiChat.exe:
+When a user launches MultiChat.exe for the first time:
+1. **Setup wizard appears** — they fill in their stream details (no code, no files)
+2. Settings are saved to `%APPDATA%\MultiChat\multichat-config.json`
+3. **Chat window opens** — Discord bridge starts automatically in the background
 
-1. **Discord bridge starts automatically** in the background — no terminal needed
-2. **The chat window opens** loading multichat.html
-3. **Minimizing closes to the system tray** — right-click the tray icon to quit or reopen
-4. **config.js is loaded from the app folder** — edit it there to change your settings
+Every launch after that skips setup and goes straight to the chat.
 
----
-
-## Updating config.js after install
-
-After installing, your `config.js` lives next to the .exe in the install directory.
-You can edit it with any text editor. Right-click the tray icon → **Open config.js**
-to open it directly.
+To change settings: right-click the **system tray icon → Settings**
 
 ---
 
 ## Distributing to others
 
-1. They download the installer
-2. They copy `config.example.js` → `config.js` and fill in their own values
-3. Double-click the .exe — everything starts automatically
-
+1. Build the .exe with `npm run build`
+2. Upload `dist/MultiChat Setup 1.0.0.exe` to a GitHub Release
+3. Users download and install — the setup wizard handles everything
+4. No config files, no terminal, no npm required for end users

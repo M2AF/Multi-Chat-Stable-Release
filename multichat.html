@@ -552,19 +552,18 @@
 
 </div>
 
+<script src="config.js" onerror=""></script>
 <script>
-// Load config from Electron saved settings (async), then init app
-(async function() {
+// If running in Electron, load settings async then init.
+// If running in browser, config.js already loaded above — init immediately.
+async function __loadConfigThenInit() {
   if (window.__electronBridge) {
     const saved = await window.__electronBridge.getSettings();
     if (saved) window.CONFIG = saved;
   }
-  // Dispatch event so the app knows config is ready
-  document.dispatchEvent(new Event('config-ready'));
-})();
-</script>
-<script src="config.js" onerror=""></script>
-<script>
+  __initApp();
+}
+function __initApp() {
 /* ── State Management ── */
 let filter = 'all';
 let autoScroll = true;
@@ -968,6 +967,10 @@ function toggleUI() {
 
 // Global access for debugging/external triggers
 window.addMessage = addMessage;
+} // end __initApp
+
+// Boot
+__loadConfigThenInit();
 </script>
 </body>
 </html>

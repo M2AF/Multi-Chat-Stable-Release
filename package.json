@@ -29,7 +29,6 @@
       "multichat.html",
       "setup.html",
       "discord-bridge.js",
-      "config.js",
       "node_modules/**/*"
     ],
     "win": {
