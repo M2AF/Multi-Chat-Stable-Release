@@ -553,14 +553,17 @@
 </div>
 
 <script>
-(function() {
+// Load config from Electron saved settings (async), then init app
+(async function() {
   if (window.__electronBridge) {
-    const cfg = window.__electronBridge.loadConfig();
-    if (cfg) window.CONFIG = cfg;
+    const saved = await window.__electronBridge.getSettings();
+    if (saved) window.CONFIG = saved;
   }
+  // Dispatch event so the app knows config is ready
+  document.dispatchEvent(new Event('config-ready'));
 })();
 </script>
-<script src="config.js" onerror="console.warn('config.js not found — using defaults')"></script>
+<script src="config.js" onerror=""></script>
 <script>
 /* ── State Management ── */
 let filter = 'all';

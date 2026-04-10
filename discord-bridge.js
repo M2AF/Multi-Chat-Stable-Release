@@ -8,32 +8,35 @@
 const WebSocket = require('ws');
 const fs        = require('fs');
 
-// ── Load config.js ────────────────────────────────────────────────────────────
-let CONFIG;
-try {
-  // Use a VM context so "const CONFIG = {...}" executes cleanly
-  const vm  = require('vm');
-  const raw = fs.readFileSync('./config.js', 'utf8');
-  const ctx = {};
-  vm.createContext(ctx);
-  vm.runInContext(raw, ctx);
-  CONFIG = ctx.CONFIG;
-  if (!CONFIG) throw new Error('CONFIG not found after eval');
-} catch (e) {
-  console.error('❌  Could not load config.js:', e.message);
+// ── Load config — supports Electron (env vars) and standalone (config.js) ────
+let BOT_TOKEN  = process.env.DISCORD_BOT_TOKEN  || '';
+let CHANNEL_ID = process.env.DISCORD_CHANNEL_ID || '';
+const WS_PORT  = parseInt(process.env.DISCORD_BRIDGE_WS_PORT || process.env.PORT) || 8081;
+
+// Fallback: load from config.js if env vars not set
+if (!BOT_TOKEN || !CHANNEL_ID) {
+  try {
+    const vm  = require('vm');
+    const raw = fs.readFileSync('./config.js', 'utf8');
+    const ctx = {};
+    vm.createContext(ctx);
+    vm.runInContext(raw, ctx);
+    const CONFIG = ctx.CONFIG;
+    if (CONFIG) {
+      BOT_TOKEN  = BOT_TOKEN  || CONFIG.DISCORD_BOT_TOKEN  || '';
+      CHANNEL_ID = CHANNEL_ID || CONFIG.DISCORD_CHANNEL_ID || '';
+    }
+  } catch(e) {
+    // config.js not found — that's OK if env vars are set
+  }
+}
+
+if (!BOT_TOKEN || BOT_TOKEN === 'YOUR_DISCORD_BOT_TOKEN') {
+  console.error('❌  No Discord bot token found. Set DISCORD_BOT_TOKEN env var or fill in config.js.');
   process.exit(1);
 }
 
-const BOT_TOKEN  = CONFIG.DISCORD_BOT_TOKEN;
-const CHANNEL_ID = CONFIG.DISCORD_CHANNEL_ID;
-const WS_PORT    = 8081;
-
-if (!BOT_TOKEN || BOT_TOKEN === 'REPLACE_WITH_NEW_TOKEN') {
-  console.error('❌  Set DISCORD_BOT_TOKEN in config.js before running.');
-  process.exit(1);
-}
-
-console.log(`✅  Config loaded — channel: ${CHANNEL_ID}`);
+console.log(`✅  Discord bridge ready — channel: ${CHANNEL_ID}`);
 
 // ── Local WS server → multichat.html ─────────────────────────────────────────
 const wss     = new WebSocket.Server({ port: WS_PORT });

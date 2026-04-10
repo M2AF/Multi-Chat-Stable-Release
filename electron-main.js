@@ -1,54 +1,117 @@
 /**
  * electron-main.js — MultiChat Desktop App
- *
- * Starts the Discord bridge as a background process,
- * then opens the chat overlay in an Electron window.
  */
 
 const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, shell } = require('electron');
-const path   = require('path');
+const path = require('path');
+const fs   = require('fs');
 const { fork } = require('child_process');
 
-let mainWindow  = null;
-let tray        = null;
-let bridgeProc  = null;
-let isQuitting  = false;
+// Settings stored in OS user data dir (survives app updates)
+const SETTINGS_PATH = path.join(app.getPath('userData'), 'multichat-config.json');
 
-// ── Start Discord bridge as a child process ───────────────────────────────────
+let mainWindow   = null;
+let setupWindow  = null;
+let tray         = null;
+let bridgeProc   = null;
+let isQuitting   = false;
+
+// ── Settings helpers ──────────────────────────────────────────────────────────
+function readSettings() {
+  try {
+    if (!fs.existsSync(SETTINGS_PATH)) return null;
+    return JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf8'));
+  } catch(e) { return null; }
+}
+
+function writeSettings(data) {
+  fs.writeFileSync(SETTINGS_PATH, JSON.stringify(data, null, 2), 'utf8');
+}
+
+function isSetupComplete() {
+  const s = readSettings();
+  return s && s.BRAND_NAME && s.BRAND_NAME !== 'YourName' && s._setupDone === true;
+}
+
+// ── IPC handlers (called from renderer pages) ─────────────────────────────────
+ipcMain.handle('get-settings', () => readSettings());
+
+ipcMain.handle('save-settings', (_, data) => {
+  data._setupDone = true;
+  writeSettings(data);
+  return true;
+});
+
+ipcMain.handle('open-main-app', () => {
+  if (setupWindow) setupWindow.close();
+  startBridge();
+  createMainWindow();
+  createTray();
+});
+
+ipcMain.handle('reopen-setup', () => {
+  if (mainWindow) mainWindow.hide();
+  createSetupWindow();
+});
+
+// ── Discord bridge ────────────────────────────────────────────────────────────
 function startBridge() {
   const bridgePath = path.join(__dirname, 'discord-bridge.js');
+  if (!fs.existsSync(bridgePath)) return;
 
-  // Check config exists before starting
-  const fs = require('fs');
-  const configPath = path.join(__dirname, 'config.js');
-  if (!fs.existsSync(configPath)) {
-    console.warn('[Bridge] config.js not found — Discord bridge not started.');
-    console.warn('[Bridge] Copy config.example.js to config.js and fill in your values.');
+  const settings = readSettings();
+  if (!settings || !settings.DISCORD_BOT_TOKEN ||
+      settings.DISCORD_BOT_TOKEN === 'YOUR_DISCORD_BOT_TOKEN') {
+    console.log('[Bridge] No Discord token configured — bridge not started');
     return;
   }
 
   bridgeProc = fork(bridgePath, [], {
     cwd: __dirname,
-    silent: true // Capture stdout/stderr instead of inheriting
+    silent: true,
+    env: {
+      ...process.env,
+      DISCORD_BOT_TOKEN:  settings.DISCORD_BOT_TOKEN,
+      DISCORD_CHANNEL_ID: settings.DISCORD_CHANNEL_ID,
+      DISCORD_BRIDGE_WS_PORT: '8081'
+    }
   });
 
   bridgeProc.stdout.on('data', (d) => process.stdout.write(`[Bridge] ${d}`));
   bridgeProc.stderr.on('data', (d) => process.stderr.write(`[Bridge] ${d}`));
-
   bridgeProc.on('exit', (code) => {
-    console.log(`[Bridge] Exited with code ${code}`);
-    // Auto-restart if it crashes (unless we're quitting)
     if (!isQuitting) {
-      console.log('[Bridge] Restarting in 3s…');
+      console.log(`[Bridge] Crashed (${code}) — restarting in 3s`);
       setTimeout(startBridge, 3000);
     }
   });
-
-  console.log('[Bridge] Discord bridge started');
+  console.log('[Bridge] Started');
 }
 
-// ── Create main window ────────────────────────────────────────────────────────
-function createWindow() {
+// ── Setup window ──────────────────────────────────────────────────────────────
+function createSetupWindow() {
+  setupWindow = new BrowserWindow({
+    width:  560,
+    height: 780,
+    resizable: false,
+    title: 'MultiChat — Setup',
+    backgroundColor: '#0e0e10',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+    show: false,
+    autoHideMenuBar: true,
+  });
+
+  setupWindow.loadFile('setup.html');
+  setupWindow.once('ready-to-show', () => setupWindow.show());
+  setupWindow.on('closed', () => { setupWindow = null; });
+}
+
+// ── Main chat window ──────────────────────────────────────────────────────────
+function createMainWindow() {
   mainWindow = new BrowserWindow({
     width:  420,
     height: 900,
@@ -61,38 +124,26 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
     },
-    // Frameless option — comment out if you want the standard window frame
-    // frame: false,
-    show: false // Don't show until ready-to-show to avoid flash
+    show: false,
+    autoHideMenuBar: true,
   });
 
   mainWindow.loadFile('multichat.html');
+  mainWindow.once('ready-to-show', () => mainWindow.show());
 
-  // Show window once fully loaded
-  mainWindow.once('ready-to-show', () => {
-    mainWindow.show();
-  });
-
-  // Open external links in the real browser, not Electron
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: 'deny' };
   });
 
-  // Minimize to tray instead of closing
   mainWindow.on('close', (e) => {
-    if (!isQuitting) {
-      e.preventDefault();
-      mainWindow.hide();
-    }
+    if (!isQuitting) { e.preventDefault(); mainWindow.hide(); }
   });
 }
 
 // ── System tray ───────────────────────────────────────────────────────────────
 function createTray() {
-  // Use a blank icon if no icon file exists
   const iconPath = path.join(__dirname, 'assets', 'icon.png');
-  const fs = require('fs');
   const icon = fs.existsSync(iconPath)
     ? nativeImage.createFromPath(iconPath)
     : nativeImage.createEmpty();
@@ -103,51 +154,43 @@ function createTray() {
   const menu = Menu.buildFromTemplate([
     {
       label: 'Show MultiChat',
-      click: () => { mainWindow.show(); mainWindow.focus(); }
+      click: () => { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } }
     },
-    { type: 'separator' },
     {
-      label: 'Open config.js',
-      click: () => {
-        const configPath = path.join(__dirname, 'config.js');
-        shell.openPath(configPath);
-      }
+      label: 'Settings',
+      click: () => { createSetupWindow(); }
     },
     { type: 'separator' },
     {
       label: 'Quit',
-      click: () => {
-        isQuitting = true;
-        app.quit();
-      }
+      click: () => { isQuitting = true; app.quit(); }
     }
   ]);
 
   tray.setContextMenu(menu);
-  tray.on('double-click', () => { mainWindow.show(); mainWindow.focus(); });
+  tray.on('double-click', () => { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } });
 }
 
-// ── App lifecycle ─────────────────────────────────────────────────────────────
+// ── App start ─────────────────────────────────────────────────────────────────
 app.whenReady().then(() => {
-  startBridge();
-  createWindow();
-  createTray();
-});
-
-app.on('window-all-closed', (e) => {
-  // Keep running in tray on all platforms
-  e.preventDefault();
-});
-
-app.on('before-quit', () => {
-  isQuitting = true;
-  if (bridgeProc) {
-    bridgeProc.kill();
-    console.log('[Bridge] Stopped');
+  if (isSetupComplete()) {
+    // Returning user — go straight to chat
+    startBridge();
+    createMainWindow();
+    createTray();
+  } else {
+    // First launch — show setup wizard
+    createSetupWindow();
   }
 });
 
+app.on('window-all-closed', (e) => e.preventDefault());
+
+app.on('before-quit', () => {
+  isQuitting = true;
+  if (bridgeProc) { bridgeProc.kill(); }
+});
+
 app.on('activate', () => {
-  // macOS: re-open window when clicking dock icon
   if (mainWindow) mainWindow.show();
 });

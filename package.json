@@ -1,30 +1,33 @@
 {
   "name": "multichat",
   "version": "1.0.0",
-  "description": "Multi-platform stream chat overlay — Twitch, YouTube, Kick, Abstract, Discord",
+  "description": "Multi-platform stream chat overlay \u2014 Twitch, YouTube, Kick, Abstract, Discord",
   "main": "electron-main.js",
   "scripts": {
-    "start":       "electron .",
-    "bridge":      "node discord-bridge.js",
-    "build":       "electron-builder --win --x64",
-    "build:mac":   "electron-builder --mac",
+    "start": "electron .",
+    "bridge": "node discord-bridge.js",
+    "build": "electron-builder --win --x64",
+    "build:mac": "electron-builder --mac",
     "build:linux": "electron-builder --linux"
   },
   "dependencies": {
     "ws": "^8.17.0"
   },
   "devDependencies": {
-    "electron":         "^29.0.0",
+    "electron": "^29.0.0",
     "electron-builder": "^24.0.0"
   },
   "build": {
     "appId": "com.multichat.overlay",
     "productName": "MultiChat",
-    "directories": { "output": "dist" },
+    "directories": {
+      "output": "dist"
+    },
     "files": [
       "electron-main.js",
       "preload.js",
       "multichat.html",
+      "setup.html",
       "discord-bridge.js",
       "config.js",
       "node_modules/**/*"
