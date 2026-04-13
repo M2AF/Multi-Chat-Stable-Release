@@ -160,7 +160,7 @@ function createMainWindow() {
 // ── System tray ───────────────────────────────────────────────────────────────
 function createTray() {
   if (tray) return; // Only create once
-  const iconPath = path.join(__dirname, 'assets', 'icon.png');
+  const iconPath = path.join(__dirname, 'assets', 'icon.ico');
   const icon = fs.existsSync(iconPath)
     ? nativeImage.createFromPath(iconPath)
     : nativeImage.createEmpty();
