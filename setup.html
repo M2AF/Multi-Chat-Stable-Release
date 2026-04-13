@@ -375,23 +375,37 @@
         <input type="url" id="abstract-url" placeholder="https://portal.abs.xyz/stream/username">
       </div>
       <div class="field">
-        <label for="abs-ws-url">AbsTools Chat WebSocket <span class="opt">optional</span></label>
-        <input type="text" id="abs-ws-url" placeholder="wss://abstools.top/api/ws?channel_id=...">
-        <div class="hint">
-          <strong style="color:var(--text)">How to find your WebSocket URL:</strong><br>
-          1. Go to <a href="#" onclick="openExternal('https://abstools.top')">abstools.top</a> and log in<br>
-          2. Click <strong style="color:var(--text)">Chat Overlay</strong> in the left menu<br>
-          3. You'll see a URL that looks like:<br>
-          <code style="color:var(--abstract); font-size:10px; word-break:break-all;">https://abstools.top/overlay/yourname</code><br>
-          4. Click the <strong style="color:var(--text)">Copy</strong> button next to that URL<br>
-          5. Paste it below — the app will automatically extract your channel ID from it<br><br>
-          <em style="color:rgba(173,173,184,0.5)">Alternatively paste the full overlay URL and we'll handle the rest.</em>
-        </div>
+        <label for="abs-username">AbsTools Username <span class="opt">optional</span></label>
+        <input type="text" id="abs-username" placeholder="e.g. criptoejesus" oninput="onAbsUsernameInput()">
+        <div class="hint">Your username on <a href="#" onclick="openExternal('https://abstools.top')">abstools.top</a> — the same one in your overlay URL.</div>
       </div>
+
       <div class="field">
-        <label for="abs-overlay-url">AbsTools Overlay URL <span class="opt">paste either this OR the WS URL above</span></label>
-        <input type="text" id="abs-overlay-url" placeholder="https://abstools.top/overlay/yourname">
-        <div class="hint">If you paste this, your WebSocket URL will be filled in automatically.</div>
+        <label for="abs-ws-url">
+          AbsTools Channel ID
+          <span class="opt">— auto-filled if you follow the steps below</span>
+        </label>
+        <input type="text" id="abs-ws-url" placeholder="wss://abstools.top/api/ws?channel_id=...">
+
+        <!-- Step by step guide -->
+        <div style="margin-top:10px; background:rgba(0,255,163,0.04); border:1px solid rgba(0,255,163,0.15); border-radius:6px; padding:12px;">
+          <div style="font-size:10px; font-weight:600; color:var(--abstract); font-family:var(--mono); margin-bottom:8px; letter-spacing:0.05em;">HOW TO FIND YOUR CHANNEL ID</div>
+          <div style="font-size:11px; color:var(--muted); line-height:1.9;">
+            <span style="color:var(--text)">1.</span> Go to
+            <a href="#" onclick="openExternal('https://abstools.top')" style="color:var(--abstract)">abstools.top</a>
+            and log in<br>
+            <span style="color:var(--text)">2.</span> Click <strong style="color:var(--text)">Chat Overlay</strong> in the left sidebar<br>
+            <span style="color:var(--text)">3.</span> Press <kbd style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); border-radius:3px; padding:1px 5px; font-size:10px;">F12</kbd> to open browser DevTools<br>
+            <span style="color:var(--text)">4.</span> Click the <strong style="color:var(--text)">Network</strong> tab → filter by <strong style="color:var(--text)">WS</strong><br>
+            <span style="color:var(--text)">5.</span> Refresh the page — you'll see a connection starting with <code style="color:var(--abstract); font-size:10px;">ws2channel_id=</code><br>
+            <span style="color:var(--text)">6.</span> Click it → copy the full URL from the <strong style="color:var(--text)">Headers</strong> tab<br>
+            <span style="color:var(--text)">7.</span> Paste it in the box above
+          </div>
+          <div style="margin-top:10px; padding-top:8px; border-top:1px solid rgba(0,255,163,0.1);">
+            <div style="font-size:10px; color:var(--muted); margin-bottom:4px;">It will look like this:</div>
+            <code style="font-size:10px; color:rgba(0,255,163,0.7); word-break:break-all; line-height:1.6;">wss://abstools.top/api/ws?channel_id=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx</code>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -533,12 +547,14 @@
     if (get('abstract-url')) channels.abstract = get('abstract-url');
 
     // Use WS URL directly, or fall back to empty
-    const absWsUrl = get('abs-ws-url') || '';
+    const absWsUrl  = get('abs-ws-url')  || '';
+    const absUsername = get('abs-username') || '';
 
     return {
       BRAND_NAME:         get('brand-name') || 'MultiChat',
       SB_WS_URL:          get('sb-url')     || 'ws://127.0.0.1:8080/',
       ABS_WS_URL:         absWsUrl,
+      ABS_USERNAME:       absUsername,
       DISCORD_WS_URL:     get('discord-ws') || 'ws://127.0.0.1:8081/',
       DISCORD_BOT_TOKEN:  get('discord-token')  || '',
       DISCORD_CHANNEL_ID: get('discord-channel') || '',
@@ -577,46 +593,30 @@
   }
 
   // ── Pre-fill if re-opening settings ──────────────────────────────────────────
-  // Auto-extract channel_id from overlay URL
-  // abstools.top/overlay/username → fetch the page, find the WS URL
-  // OR: if user pastes the overlay URL directly, we fetch the channel_id via their API
-  document.getElementById('abs-overlay-url').addEventListener('blur', async function() {
-    const overlayUrl = this.value.trim();
-    if (!overlayUrl || !overlayUrl.includes('abstools.top/overlay/')) return;
+  // Auto-fill username from abstract URL if pasted into ws field by mistake
+  function onAbsUsernameInput() {
+    // nothing needed — username is just for display reference
+  }
 
-    const username = overlayUrl.split('/overlay/')[1]?.split('?')[0]?.split('/')[0];
-    if (!username) return;
-
-    // AbsTools API endpoint to get channel info by username
-    const wsField = document.getElementById('abs-ws-url');
-    wsField.value = 'Fetching…';
-
-    try {
-      const res  = await fetch(`https://abstools.top/api/channel?username=${username}`);
-      const data = await res.json();
-      const id   = data?.channel_id || data?.id || data?.uuid;
-      if (id) {
-        wsField.value = `wss://abstools.top/api/ws?channel_id=${id}`;
-        wsField.style.borderColor = 'rgba(0,255,163,0.4)';
-      } else {
-        // Fallback: just use the username to build a likely URL
-        wsField.value = '';
-        wsField.placeholder = 'Could not auto-detect — paste your channel_id manually';
-      }
-    } catch(e) {
-      wsField.value = '';
-      wsField.placeholder = 'Could not fetch — paste your channel_id manually';
-    }
-  });
-
-  // Also allow pasting directly into the WS field — auto-clean it
   document.getElementById('abs-ws-url').addEventListener('blur', function() {
     const val = this.value.trim();
-    // If they pasted the overlay URL into the WS field by mistake
-    if (val.includes('abstools.top/overlay/')) {
-      document.getElementById('abs-overlay-url').value = val;
+    if (!val) return;
+
+    // If they pasted an overlay/page URL instead of the WS URL, clear and guide them
+    if (val.startsWith('http') && !val.startsWith('wss://') && !val.startsWith('ws://')) {
       this.value = '';
-      document.getElementById('abs-overlay-url').dispatchEvent(new Event('blur'));
+      this.style.borderColor = 'rgba(255,100,100,0.5)';
+      this.placeholder = '⚠️ Paste the wss:// URL from the Network tab, not a page URL';
+      setTimeout(() => {
+        this.style.borderColor = '';
+        this.placeholder = 'wss://abstools.top/api/ws?channel_id=...';
+      }, 4000);
+      return;
+    }
+
+    // Valid WS URL — highlight green
+    if (val.includes('abstools.top/api/ws')) {
+      this.style.borderColor = 'rgba(0,255,163,0.4)';
     }
   });
 
@@ -629,7 +629,7 @@
     set('brand-name',      s.BRAND_NAME);
     set('sb-url',          s.SB_WS_URL);
     set('abs-ws-url',      s.ABS_WS_URL);
-    set('abs-overlay-url', s.ABS_OVERLAY_URL);
+    set('abs-username',    s.ABS_USERNAME || '');
     set('twitch-url',      s.CHANNELS?.twitch);
     set('youtube-url',     s.CHANNELS?.youtube);
     set('kick-url',        s.CHANNELS?.kick);
