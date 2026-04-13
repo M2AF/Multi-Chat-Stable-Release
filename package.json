@@ -29,6 +29,7 @@
       "multichat.html",
       "setup.html",
       "discord-bridge.js",
+      "installer.nsh",
       "node_modules/**/*"
     ],
     "win": {
@@ -39,7 +40,9 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "deleteAppDataOnUninstall": false,
+      "script": "installer.nsh"
     },
     "mac": {
       "target": "dmg",

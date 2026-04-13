@@ -7,8 +7,10 @@ const path = require('path');
 const fs   = require('fs');
 const { fork } = require('child_process');
 
-// Settings stored in OS user data dir (survives app updates)
-const SETTINGS_PATH = path.join(app.getPath('userData'), 'multichat-config.json');
+// Settings stored in OS user data dir
+// Uses a fixed filename — version checked inside the file itself
+const SETTINGS_PATH = path.join(app.getPath('userData'), 'multichat-settings.json');
+const APP_VERSION   = app.getVersion(); // from package.json
 
 let mainWindow   = null;
 let setupWindow  = null;
@@ -30,14 +32,23 @@ function writeSettings(data) {
 
 function isSetupComplete() {
   const s = readSettings();
-  return s && s.BRAND_NAME && s.BRAND_NAME !== 'YourName' && s._setupDone === true;
+  if (!s || !s._setupDone || !s.BRAND_NAME || s.BRAND_NAME === 'YourName') return false;
+  // If major version changed, force setup again
+  const savedMajor = (s._appVersion || '0').split('.')[0];
+  const currentMajor = APP_VERSION.split('.')[0];
+  if (savedMajor !== currentMajor) {
+    console.log(`[Setup] Major version changed (${savedMajor} → ${currentMajor}) — showing setup`);
+    return false;
+  }
+  return true;
 }
 
 // ── IPC handlers (called from renderer pages) ─────────────────────────────────
 ipcMain.handle('get-settings', () => readSettings());
 
 ipcMain.handle('save-settings', (_, data) => {
-  data._setupDone = true;
+  data._setupDone  = true;
+  data._appVersion = APP_VERSION;
   writeSettings(data);
   return true;
 });
@@ -52,6 +63,11 @@ ipcMain.handle('open-main-app', () => {
 ipcMain.handle('reopen-setup', () => {
   if (mainWindow) mainWindow.hide();
   createSetupWindow();
+});
+
+ipcMain.handle('reset-settings', () => {
+  if (fs.existsSync(SETTINGS_PATH)) fs.unlinkSync(SETTINGS_PATH);
+  return true;
 });
 
 // ── Discord bridge ────────────────────────────────────────────────────────────
@@ -160,6 +176,27 @@ function createTray() {
     {
       label: 'Settings',
       click: () => { createSetupWindow(); }
+    },
+    {
+      label: 'Reset & Clear Data',
+      click: () => {
+        const { dialog } = require('electron');
+        dialog.showMessageBox({
+          type: 'question',
+          buttons: ['Delete & Restart Setup', 'Cancel'],
+          defaultId: 1,
+          title: 'Reset MultiChat',
+          message: 'Delete all saved settings?',
+          detail: 'This will remove your stream links, Discord token, and preferences. The setup wizard will reopen.'
+        }).then(({ response }) => {
+          if (response === 0) {
+            if (fs.existsSync(SETTINGS_PATH)) fs.unlinkSync(SETTINGS_PATH);
+            if (bridgeProc) { bridgeProc.kill(); bridgeProc = null; }
+            if (mainWindow) { mainWindow.destroy(); mainWindow = null; }
+            createSetupWindow();
+          }
+        });
+      }
     },
     { type: 'separator' },
     {
