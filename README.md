@@ -10,7 +10,6 @@ Combine **Twitch, YouTube, Kick, Abstract, and Discord** chat into one clean ove
 
 ### What you need
 - [OBS Studio](https://obsproject.com/)
-- [Streamer.bot](https://streamer.bot/) — handles Twitch, YouTube, Kick
 - [Node.js v16+](https://nodejs.org/) — only needed for the Discord bridge
 - A Discord bot token — [create one free here](https://discord.com/developers/applications)
 
