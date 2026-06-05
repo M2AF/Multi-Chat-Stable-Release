@@ -18,7 +18,7 @@ Combine **Twitch, YouTube, Kick, Abstract, and Discord** chat into one clean ove
 ## Step 1 — Get the files
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/multichat.git
+git clone https://github.com/M2AF/Multi-Chat-Stable-Release.git
 cd multichat
 npm install
 ```
